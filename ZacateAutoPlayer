@@ -1,0 +1,205 @@
+from ZacateState import Dice
+from ZacateState import Scorecard
+import random
+import operator
+import itertools
+
+d=Dice()
+scorey=Scorecard()
+scores={}
+
+
+#function to evaluate what the current status of each category for the dice combination is i.e if they are satisfied
+# and if not what are the required elements to satisfy the criteria for the category
+def checkcombi(dice):
+        hashm={}
+        counts = [dice.dice.count(i) for i in range(1,7)]
+        for j in scorey.Numbers:
+          for i in range(0,5):
+            if (dice.dice[i]==scorey.Numbers.get(j)):
+              hashm[j]=["yes",counts[scorey.Numbers.get(j)-1]]
+              break
+            else:
+              hashm[j]= ["no",0]
+        hashm["pupusa de queso"]=["yes",'123456'] if sorted(dice.dice) == [1,2,3,4,5] or sorted(dice.dice) == [2,3,4,5,6] else  ["no",0]
+        if (len(set([1,2,3,4]) - set(dice.dice)) == 0):
+           hashm["pupusa de frijol"]=["yes",'1234']
+        elif len(set([2,3,4,5]) - set(dice.dice)) == 0:
+             hashm["pupusa de frijol"]=["yes",'2345']
+        elif len(set([3,4,5,6]) - set(dice.dice)) == 0:
+              hashm["pupusa de frijol"]=["yes",'3456']
+        else:
+             hashm["pupusa de frijol"]=["no",0]
+        if(2 in counts and 3 in counts):
+            temp=[m for m in range(0,6) if (counts[m]==2 or counts[m]==3) ]
+            hashm["elote"]=["yes",temp]
+        else:
+            hashm["elote"]=["no",0]
+        if(max(counts)>=3):
+            for i in range(0,6) :
+                if counts[i]>=3:
+                   hashm["triple"]=["yes",i+1  ]
+        else:
+                    hashm["triple"]=["no",0]
+        if(max(counts)>=4):
+            for i in range(0,6) :
+                if counts[i]>=4:
+                   hashm["cuadruple"]=["yes",i+1]
+        else:
+                    hashm["cuadruple"]=["no",0]
+        if(max(counts)>=5):
+            for i in range(0,6) :
+                if counts[i]>=5:
+                   hashm["quintupulo"]=["yes",i+1]
+        else:
+                    hashm["quintupulo"]=["no",0]
+        return hashm
+
+class ZacateAutoPlayer:
+      keep=[]
+      count=0
+      def __init__(self):
+         pass
+      def __getitem__(self, item):
+         return self.coords[item]
+
+      def first_roll(self, dice, scorecard):
+             ZacateAutoPlayer.count=(ZacateAutoPlayer.count+1 if ZacateAutoPlayer.count<13 else 1)
+             counts=[dice.dice.count(i) for i in range(1,7)]
+             plays=checkcombi(dice)
+             val= evaluateNextMove(plays,dice,ZacateAutoPlayer.count,counts,scorecard,1)
+             return val
+
+      def second_roll(self, dice, scorecard):
+            plays=checkcombi(dice)
+            counts=[dice.dice.count(i) for i in range(1,7)]
+            val=evaluateNextMove(plays,dice,ZacateAutoPlayer.count,counts,scorecard,2)
+            return val
+      #evaluates which category to choose for scoring
+      def third_roll(self, dice, scorecard):
+            plays=checkcombi(dice)
+            counts=[dice.dice.count(i) for i in range(1,7)]
+            val=evaluateNextMove(plays,dice,3,counts,scorecard,3)
+            maxx=sorted(scores["yes"].values(),reverse=True)
+            keys=[]
+            for mval in maxx:
+              a=([k for k,v in scores["yes"].items() if v==mval])
+              m=[i for i,v in scores["yes"].items() if ((v==mval and mval>9) and (i=="unos" or i=="doses" or i=="treses" or i=="cuatros" or i=="cincos" or i=="seises")) ]
+              ret=[j for j in m if j not in scorecard.scorecard]
+              if ret:
+                  return ret[0]
+              for i in a:
+                keys.append(i)
+            keys=remove_duplicates(keys)
+            if(scorecard.scorecard != {}):
+                    a=[k for k in keys if k not in scorecard.scorecard]
+                    if len(a)==0:
+                      return random.choice( list(set(Scorecard.Categories) - set(scorecard.scorecard.keys())))
+                    #try to fill up the first six categories in initial turns to aim for bonus score
+                    if(a[0]=='cuadruple' and ZacateAutoPlayer.count<7):
+                        vall=[(i+1) for i in range(0,6) if counts[i]==4]
+                        if len(vall)>0:
+                          value= scorey.Categories[vall[0]-1]
+                          if value not in scorecard.scorecard:
+                            return value
+                    if(a[0]=='triple' and ZacateAutoPlayer.count<7):
+                        vall=[(i+1) for i in range(0,6) if counts[i]==3]
+                        if len(vall)>0:
+                         value= scorey.Categories[vall[0]-1]
+                         if value not in scorecard.scorecard:
+                            return value
+                    return a[0]
+
+            else:
+                  return keys[0]
+
+def remove_duplicates(values):
+    output = []
+    seen = set()
+    for value in values:
+        # If value has not been encountered yet,
+        # ... add it to both list and set.
+        if value not in seen:
+            output.append(value)
+            seen.add(value)
+    return output
+
+def evaluateNextMove(status,dice,turn,counts,scorecard,roll):
+    #getting the score of the various categories that have completed moves that are satisfying categories
+     scores['yes']={}
+     scores['no']={}
+     for i in scorey.Categories :
+         if(i!="tamal" and status[i][0]!= 'no' ):
+              if i in Scorecard.Numbers:
+                 score = counts[Scorecard.Numbers[i]-1] * Scorecard.Numbers[i]
+              elif i == "pupusa de queso":
+                 score = 40 if sorted(dice.dice) == [1,2,3,4,5] or sorted(dice.dice) == [2,3,4,5,6] else 0
+              elif i == "pupusa de frijol":
+                 score = 30 if (len(set([1,2,3,4]) - set(dice.dice)) == 0 or len(set([2,3,4,5]) - set(dice.dice)) == 0 or len(set([3,4,5,6]) - set(dice.dice)) == 0) else 0
+              elif i == "elote":
+                 score = 25 if (2 in counts) and (3 in counts) else 0
+              elif i == "triple":
+                 score = sum(dice.dice) if max(counts) >= 3 else 0
+              elif i == "cuadruple":
+                  score = sum(dice.dice) if max(counts) >= 4 else 0
+              elif i == "quintupulo":
+                  score = 50 if max(counts) == 5 else 0
+              else:
+                  score=-1
+              scores['yes'][i]=(score)
+         else:
+             if(i!='tamal'):
+              combi={}
+              if i in Scorecard.Numbers and status[i][0]=='no' and i!='tamal':
+                   combi= [dice.dice[k] if dice.dice[k]!=Scorecard.Numbers[i] else 0 for k in range(0,5)]
+              elif i == "pupusa de queso":
+                  a=set([1,2,3,4,5])-set(sorted(dice.dice))
+                  b= set([2,3,4,5,6])-set(sorted(dice.dice))
+                  combi=[list(a),list(b)]
+              elif i == "pupusa de frijol":
+                  a=set([1,2,3,4,])-set(sorted(dice.dice))
+                  b= set([2,3,4,5,])-set(sorted(dice.dice))
+                  c=set([3,4,5,6])-set(sorted(dice.dice))
+                  combi=[list(a),list(b),list(c)]
+              elif i == "elote":
+                  a=[k+1 if counts[k]>=2 else 0 for k in range(0,6)]
+                  combi=a
+              elif i == "triple":
+                 combi=[k+1 if(counts[k]>=2) else 0 for k in range(0,6)]
+
+              elif i == "cuadruple":
+                  combi=[k+1 if(counts[k]>=3) else 0 for k in range(0,6)]
+              elif i == "quintupulo":
+                 combi=[k+1 if(counts[k]>=3) else 0 for k in range(0,6)]
+              scores['no'][i]= combi
+     t=[]
+     for i in scores["yes"]:
+         if(i not in scorecard.scorecard):
+          if(i=="quintupulo" or i=="pupusa de queso" or i=="pupusa de frijol" or i=="cuadruple" or i=="elote" ):
+              return []
+          if(i=="doses" or i=="treses" or i=='cuatres' or i=='cincos' or i=='seises' and scores["yes"][i]>18 ):
+            a=[i for i in range(1,7) if counts[i-1]>=3]
+            for i in a:
+                t.append(i)
+
+     for sc in status:
+         t.append(1 if (sc=="unos") and status["unos"][1]>=3 else 0)
+         t.append(2 if (sc=="doses") and status["doses"][1]>=3 else 0)
+         t.append(3 if (sc=="treses") and status["treses"][1]>=3 else 0)
+         t.append(4 if (sc=="cuatros") and status["cuatros"][1]>=3 else 0)
+         t.append(5 if (sc=="cincos") and status["cincos"][1]>=2 else 0)
+         t.append(6 if (sc=="seises") and status["seises"][1]>=2 else 0)
+
+
+     t=list(set(t))
+     positions=[]
+     for j in range(0,5):
+             if dice.dice[j] not in t:
+                 positions.append(j)
+     if positions==[]:
+         positions=list(set([0,1,2,3,4])-(set(positions)))
+     positions=list(set(positions))
+     return positions
+
+
+
